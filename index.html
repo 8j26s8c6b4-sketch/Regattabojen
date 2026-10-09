@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bahnleger – Autonome Regattabojen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e6ecef; --panel:#ffffff; --panel-2:#f2f6f8; --ink:#12324a; --ink-2:#4f687a; --line:#cfdae0;
+  --water:#bfe0e3; --water-edge:#8fc3ca; --land:#d6dfc2; --grid:rgba(18,50,74,.10); --stroke-halo:#ffffff;
+  --mark:#ff6a13; --ok:#1c8a56; --warn:#c98a00; --bad:#c7362b; --route:#12324a; --streak:rgba(255,255,255,.75);
+  --font:"Barlow", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-num:"Barlow Semi Condensed", "Barlow", "Arial Narrow", Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1a22; --panel:#13252f; --panel-2:#183140; --ink:#e4edf1; --ink-2:#9cb1bd; --line:#26404f;
+    --water:#123a4b; --water-edge:#1f5a6e; --land:#1b2a21; --grid:rgba(228,237,241,.07); --stroke-halo:#0d1a22;
+    --mark:#ff7d2e; --ok:#3fbf7f; --warn:#e6b030; --bad:#f0594d; --route:#e4edf1; --streak:rgba(200,235,245,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1a22; --panel:#13252f; --panel-2:#183140; --ink:#e4edf1; --ink-2:#9cb1bd; --line:#26404f;
+  --water:#123a4b; --water-edge:#1f5a6e; --land:#1b2a21; --grid:rgba(228,237,241,.07); --stroke-halo:#0d1a22;
+  --mark:#ff7d2e; --ok:#3fbf7f; --warn:#e6b030; --bad:#f0594d; --route:#e4edf1; --streak:rgba(200,235,245,.35);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;min-width:0}
+.brand h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.brand span{color:var(--ink-2);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.chip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:16px;background:var(--panel-2);border:1px solid var(--line);font-size:13.5px;font-weight:500;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+.chip.sim i{background:var(--warn)}
+button.chip{cursor:pointer}
+main{display:grid;grid-template-columns:1fr 372px;min-height:0}
+.mapwrap{position:relative;min-height:0;overflow:hidden;background:var(--land)}
+#map{position:absolute;inset:0;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.overlay{position:absolute;pointer-events:none;font-size:13px}
+.windcard{top:12px;left:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 0 var(--line)}
+.windcard b{font-family:var(--font-num);font-size:20px;font-weight:700;display:block;line-height:1.1}
+.windcard small{color:var(--ink-2);font-size:12.5px}
+.north{top:12px;right:12px;width:40px;height:52px}
+.scale{left:14px;bottom:14px;color:var(--ink);font-family:var(--font-num);font-weight:600}
+.scale div{height:6px;border:2px solid var(--ink);border-top:none;margin-top:2px}
+.banner{position:absolute;left:50%;transform:translateX(-50%);bottom:26px;max-width:min(560px,calc(100% - 28px));background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:10px 12px;display:none;align-items:center;gap:12px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.banner.show{display:flex}
+.banner.bad{border-left-color:var(--bad)}
+.banner button{flex:none}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;min-height:0;display:flex;flex-direction:column}
+section{padding:16px 18px;border-bottom:1px solid var(--line)}
+section h2{margin:0 0 10px;font-size:15px;font-weight:600;color:var(--ink)}
+.seg{display:grid;grid-template-columns:repeat(2,1fr);background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{height:40px;border:0;border-radius:8px;background:transparent;cursor:pointer;font-weight:500;font-size:14.5px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel);font-weight:600}
+.wind{display:grid;grid-template-columns:132px 1fr;gap:14px;align-items:center}
+#dial{width:132px;height:132px;touch-action:none;cursor:grab}
+.windctl{display:flex;flex-direction:column;gap:10px}
+.windctl .big{font-family:var(--font-num);font-size:30px;font-weight:700;line-height:1}
+.windctl .big small{font-size:16px;color:var(--ink-2);font-weight:600;margin-left:4px}
+.row{display:flex;gap:8px;align-items:center}
+.btn{height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;font-weight:600;font-size:14.5px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.sm{height:36px;padding:0 10px;font-size:14px}
+.btn.primary{background:var(--mark);border-color:var(--mark);color:#fff;width:100%;height:52px;font-size:16.5px}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.ghost{background:transparent}
+.slider{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;margin-top:12px}
+.slider label{font-size:14px;color:var(--ink-2)}
+.slider output{font-family:var(--font-num);font-weight:700;font-size:17px;text-align:right}
+.slider input{grid-column:1 / -1;width:100%;accent-color:var(--mark);height:28px}
+.actions{display:grid;gap:10px}
+.actions .row .btn{flex:1}
+.numgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.numfld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.numfld>label{font-size:13.5px;color:var(--ink-2);line-height:1.2}
+.stepper{display:grid;grid-template-columns:34px 1fr 34px;align-items:stretch;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);overflow:hidden}
+.stepper button{border:0;background:transparent;cursor:pointer;font-size:18px;font-weight:600;height:40px}
+.stepper button:active{background:var(--line)}
+.stepper input{width:100%;min-width:0;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--panel);color:var(--ink);font-family:var(--font-num);font-weight:700;font-size:17px;text-align:center;height:40px;-moz-appearance:textfield;appearance:textfield}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.numfld small{font-size:12.5px;color:var(--ink-2);font-family:var(--font-num);font-weight:600}
+.hint{font-size:13px;color:var(--ink-2);margin:8px 0 0}
+.buoys{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.buoy{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--panel)}
+.buoy[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.buoy .dot{width:14px;height:14px;border-radius:50%;grid-row:1 / span 2;box-shadow:0 0 0 2px var(--panel),0 0 0 3px var(--line)}
+.buoy .name{font-weight:600;font-size:14.5px}
+.buoy .name small{font-weight:500;color:var(--ink-2);margin-left:4px}
+.buoy .state{font-size:13px;color:var(--ink-2)}
+.buoy .state.ok{color:var(--ok)}
+.buoy .state.bad{color:var(--bad)}
+.buoy .meta{grid-row:1 / span 2;text-align:right;font-family:var(--font-num);font-weight:600;font-size:15px;line-height:1.25}
+.batt{display:inline-block;width:26px;height:11px;border:1.5px solid var(--ink-2);border-radius:2px;position:relative;vertical-align:-1px;margin-left:4px}
+.batt::after{content:"";position:absolute;right:-4px;top:2px;width:2px;height:4px;background:var(--ink-2);border-radius:0 1px 1px 0}
+.batt b{position:absolute;left:1px;top:1px;bottom:1px;background:var(--ok);border-radius:1px}
+.foot{padding:14px 18px 18px;font-size:12.5px;color:var(--ink-2);margin-top:auto}
+.toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top,0px));transform:translate(-50%,-10px);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-weight:500;font-size:14.5px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:10;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+/* SVG */
+.lake{fill:var(--water);fill-opacity:.3;stroke:var(--water-edge);stroke-width:2;stroke-dasharray:7 5;vector-effect:non-scaling-stroke}
+#tiles image{image-rendering:auto}
+:root[data-theme="dark"] #tiles{filter:brightness(.62) contrast(1.05) saturate(.75)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) #tiles{filter:brightness(.62) contrast(1.05) saturate(.75)}}
+#map{cursor:grab}#map.panning{cursor:grabbing}
+.zoomctl{position:absolute;top:70px;right:12px;display:flex;flex-direction:column;gap:6px}
+.zoomctl button{width:52px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-weight:700;font-size:13px;box-shadow:0 1px 0 var(--line);padding:0}
+.zoomctl button.sq{font-size:22px;line-height:1}
+.zoomctl button:active{background:var(--panel-2)}
+.attr{position:absolute;right:0;bottom:0;background:var(--panel);color:var(--ink-2);font-size:11px;padding:2px 6px;border-top-left-radius:6px;opacity:.9}
+.attr a{color:inherit}
+.attr[data-off="1"]::after{content:" \00b7  Kartenkacheln nicht erreichbar (offline)"}
+.gridl{stroke:var(--grid);stroke-width:1;vector-effect:non-scaling-stroke}
+.gridt{fill:var(--ink-2);font-family:var(--font-num);opacity:.7}
+.streak{stroke:var(--streak);stroke-linecap:round;vector-effect:non-scaling-stroke;stroke-width:1.4}
+.route{fill:none;stroke:var(--route);stroke-dasharray:6 6;vector-effect:non-scaling-stroke;stroke-width:1.6;opacity:.75}
+.startline{stroke:var(--route);vector-effect:non-scaling-stroke;stroke-width:2}
+.legt{fill:var(--ink);font-family:var(--font-num);font-weight:600;paint-order:stroke;stroke:var(--stroke-halo);stroke-linejoin:round}
+.markt{fill:var(--ink);font-family:var(--font);font-weight:700;paint-order:stroke;stroke:var(--stroke-halo);stroke-linejoin:round}
+.mark .ring{fill:none;stroke:var(--mark);vector-effect:non-scaling-stroke;stroke-width:2.5;stroke-dasharray:4 3}
+.mark .core{fill:var(--mark);opacity:.35}
+.mark.set .ring{stroke-dasharray:none}
+.mark.set .core{opacity:1}
+.mark.bad .ring{stroke:var(--bad);stroke-dasharray:none}
+.mark .hit{fill:transparent;cursor:grab}
+.handle .hitc{fill:transparent;cursor:move}
+.handle path{stroke:var(--ink);fill:none;vector-effect:non-scaling-stroke;stroke-width:2}
+.handle circle.v{fill:var(--panel);stroke:var(--ink);vector-effect:non-scaling-stroke;stroke-width:2}
+.trail{fill:none;vector-effect:non-scaling-stroke;stroke-width:1.5;opacity:.45}
+.bbody{stroke:var(--stroke-halo);vector-effect:non-scaling-stroke;stroke-width:2}
+.bhead{vector-effect:non-scaling-stroke;stroke-width:2.5;stroke-linecap:round}
+.bsel{fill:none;stroke:var(--ink);vector-effect:non-scaling-stroke;stroke-width:2}
+.base rect{fill:var(--ink)}
+.base text{fill:var(--ink);font-weight:600;paint-order:stroke;stroke:var(--stroke-halo)}
+@media (max-width:899px){
+  main{grid-template-columns:1fr;grid-template-rows:56vh auto;overflow-y:auto}
+  aside{border-left:none;border-top:1px solid var(--line);overflow:visible}
+  .brand span{display:none}
+}
+@media (max-width:520px){
+  .chips .chip:not(.sim){display:none}
+  .wind{grid-template-columns:116px 1fr}
+  #dial{width:116px;height:116px}
+}
+@media (prefers-reduced-motion: reduce){ .toast{transition:none} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><h1>Bahnleger</h1><span>Autonome Regattabojen</span></div>
+    <div class="chips">
+      <span class="chip"><i></i>Basis: RTK Fix</span>
+      <span class="chip" id="chipLink"><i></i>Funk: 6/6 Bojen</span>
+      <button class="chip sim" id="simBtn" title="Simulationsgeschwindigkeit ändern"><i></i>Simulation ×10</button>
+    </div>
+  </header>
+  <main>
+    <div class="mapwrap" id="mapwrap">
+      <svg id="map" viewBox="-200 -330 400 360" preserveAspectRatio="xMidYMid meet" aria-label="Karte von Bremen und Bremerhaven mit Fahrgebiet und Regattakurs">
+        <defs><clipPath id="lakeclip"><path id="lakeclipPath"/></clipPath></defs>
+        <g id="tiles"></g>
+        <path id="lake" class="lake"/>
+        <g id="grid"></g>
+        <g id="streaks" clip-path="url(#lakeclip)"></g>
+        <g id="course"></g>
+        <g id="buoyLayer"></g>
+        <g id="baseLayer" class="base"></g>
+      </svg>
+      <div class="overlay windcard">
+        <svg width="40" height="40" viewBox="-20 -20 40 40" aria-hidden="true"><g id="miniArrow"><path d="M0,-15 L0,13 M-6,6 L0,14 L6,6" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+        <div><b id="windTxt">350° N</b><small id="windSub">3 Bft</small></div>
+      </div>
+      <svg class="overlay north" viewBox="0 0 40 52" aria-hidden="true"><path d="M20 4 L30 34 L20 28 L10 34 Z" fill="var(--ink)"/><text x="20" y="50" text-anchor="middle" font-family="Barlow, sans-serif" font-weight="700" font-size="14" fill="var(--ink)">N</text></svg>
+      <div class="overlay scale" id="scale"><span id="scaleTxt">50 m</span><div id="scaleBar"></div></div>
+      <div class="zoomctl" role="group" aria-label="Kartenansicht">
+        <button type="button" class="sq" id="zIn" aria-label="Hineinzoomen" title="Hineinzoomen">+</button>
+        <button type="button" class="sq" id="zOut" aria-label="Herauszoomen" title="Herauszoomen">&minus;</button>
+        <button type="button" id="zCourse" aria-label="Ansicht auf den Kurs" title="Ansicht auf Kurs und Basisstation">Kurs</button>
+        <button type="button" id="zRegion" aria-label="Ansicht Bremen und Bremerhaven" title="Gesamtansicht Bremen und Bremerhaven">Region</button>
+      </div>
+      <div class="attr" id="attr">&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a></div>
+      <div class="banner" id="banner"><span id="bannerTxt"></span><button class="btn sm" id="bannerBtn"></button></div>
+    </div>
+    <aside>
+      <section>
+        <h2>Kursform</h2>
+        <div class="seg" role="group" aria-label="Kursform">
+          <button data-tpl="updown" aria-pressed="true">Up-and-Down</button>
+          <button data-tpl="gates" aria-pressed="false">Luv-/Lee-Gate</button>
+        </div>
+        <div class="slider"><label for="legIn">Schenkellänge</label><output id="legOut">150 m</output><input type="range" id="legIn" min="40" max="200" step="5" value="150"></div>
+        <div class="slider"><label for="startIn">Länge der Startlinie</label><output id="startOut">20 m</output><input type="range" id="startIn" min="10" max="40" step="1" value="20"></div>
+        <div class="numgrid">
+          <div class="numfld">
+            <label for="startOffIn">Startlinie zum Lee-Gate (m)</label>
+            <div class="stepper"><button type="button" data-for="startOffIn" data-d="-1" aria-label="1 Meter Richtung Lee">−</button><input type="number" id="startOffIn" min="-150" max="250" step="1" value="-16" inputmode="decimal"><button type="button" data-for="startOffIn" data-d="1" aria-label="1 Meter Richtung Wind">+</button></div>
+            <small id="startOffTxt"></small>
+          </div>
+          <div class="numfld">
+            <label for="startAngIn">Winkel Boje 1 (°)</label>
+            <div class="stepper"><button type="button" data-for="startAngIn" data-d="-1" aria-label="1 Grad weniger">−</button><input type="number" id="startAngIn" min="-45" max="45" step="1" value="0" inputmode="decimal"><button type="button" data-for="startAngIn" data-d="1" aria-label="1 Grad mehr">+</button></div>
+            <small id="startAngTxt"></small>
+          </div>
+          <div class="numfld">
+            <label for="d34In">Abstand Boje 3 – 4 (m)</label>
+            <div class="stepper"><button type="button" data-for="d34In" data-d="-1" aria-label="1 Meter weniger">−</button><input type="number" id="d34In" min="3" max="100" step="1" value="14" inputmode="decimal"><button type="button" data-for="d34In" data-d="1" aria-label="1 Meter mehr">+</button></div>
+            <small id="d34Txt"></small>
+          </div>
+          <div class="numfld">
+            <label for="d56In">Abstand Boje 5 – 6 (m)</label>
+            <div class="stepper"><button type="button" data-for="d56In" data-d="-1" aria-label="1 Meter weniger">−</button><input type="number" id="d56In" min="3" max="100" step="1" value="14" inputmode="decimal"><button type="button" data-for="d56In" data-d="1" aria-label="1 Meter mehr">+</button></div>
+            <small id="d56Txt"></small>
+          </div>
+        </div>
+        <p class="hint">Boje 3–4: Beim Up-and-Down liegt Boje 3 exakt auf der Kursachse und Boje 4 daneben; beim Luv-/Lee-Gate liegen beide gleich weit links und rechts der Mitte. Boje 5–6 liegen immer symmetrisch zur Kursachse.</p>
+        <p class="hint">Startlinie: 0 = auf Höhe des Lee-Gates, positiv = Richtung Wind, negativ = Richtung Lee. Winkel: 2 dreht die Linie auf 88° zum Wind (rechtes Ende zum Wind hin), −2 auf 92°.</p>
+        <div class="row" style="margin-top:12px"><button class="btn sm" id="fitBtn" style="flex:1">Im See einpassen</button><button class="btn sm" id="alignBtn" style="flex:1">An Wind ausrichten</button></div>
+        <p class="hint">Marken auf der Karte ziehen, um sie einzeln zu verschieben. Das Kreuz an der Startlinie verschiebt den ganzen Kurs.</p>
+      </section>
+      <section>
+        <h2>Wind</h2>
+        <div class="wind">
+          <svg id="dial" viewBox="-66 -66 132 132" role="slider" aria-label="Windrichtung" aria-valuemin="0" aria-valuemax="359" tabindex="0"></svg>
+          <div class="windctl">
+            <div class="big" id="dialTxt">350°<small>N</small></div>
+            <div class="row"><button class="btn sm" id="wMinus" aria-label="Wind 5 Grad nach links">−5°</button><button class="btn sm" id="wPlus" aria-label="Wind 5 Grad nach rechts">+5°</button></div>
+          </div>
+        </div>
+        <div class="slider"><label for="bftIn">Windstärke</label><output id="bftOut">3 Bft</output><input type="range" id="bftIn" min="1" max="6" step="1" value="3"></div>
+      </section>
+      <section class="actions">
+        <button class="btn primary" id="deployBtn">Kurs an Bojen senden</button>
+        <div class="row"><button class="btn" id="homeBtn">Alle zurückholen</button><button class="btn danger" id="stopBtn">Not-Aus</button></div>
+        <p class="hint" id="deployHint"></p>
+      </section>
+      <section>
+        <h2>Bojen</h2>
+        <ul class="buoys" id="buoyList" role="listbox" aria-label="Bojen"></ul>
+      </section>
+      <p class="foot">Karte: OpenStreetMap (Bremen/Bremerhaven, braucht Internet). Die Basisstation steht in der Simulation am Wassersportverein Wulsdorf, Bremerhaven (53,49942° N, 8,57929° E). Das gestrichelte Fahrgebiet ist eine Annahme und nicht die exakte Uferlinie.<br><br>Diese Demo simuliert Bojen, Wind und Akkus. Im echten System läuft die Seite auf der Basisstation am Ufer und steuert die Bojen per Funk.</p>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+const norm = d => ((d % 360) + 360) % 360;
+const angDiff = (a, b) => ((a - b + 540) % 360) - 180;
+const hyp = Math.hypot;
+const DIRS = ["N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const dirName = d => DIRS[Math.round(norm(d) / 22.5) % 16];
+const fmt = (n, d = 0) => n.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- See (lokales Koordinatensystem, Basis = Ursprung, Meter) ---------- */
+const LAKE = [[-172,38],[-142,14],[-95,6],[-40,0],[25,0],[70,10],[112,5],[152,20],[178,58],[170,108],[190,160],[178,220],[150,262],[108,278],[72,310],[15,322],[-40,305],[-88,314],[-132,290],[-162,248],[-178,200],[-168,150],[-188,100]];
+const BASE = { x: 0, y: -12 };
+/* ---------- Geo: lokale Meter <-> Web-Mercator-Kacheln ----------
+   Die Basisstation (lokal 0/-12) liegt am Wassersportverein Wulsdorf, Bremerhaven. */
+const WVW = { lat: 53.49942, lon: 8.57929 };
+/* OSM-Standardkacheln. Die OSM Tile Usage Policy verlangt einen gültigen Referer: Die Seite muss
+   über eine echte https://-Adresse laufen (nicht per Doppelklick/file://). Siehe Meta-Tag "referrer" oben. */
+const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const TILE_MAX_Z = 19, MIN_W = 30, MAX_W = 130000;
+const R_E = 6378137, HALF = Math.PI * R_E;
+const mercOf = (lat, lon) => ({ x: R_E * rad(lon), y: R_E * Math.log(Math.tan(Math.PI / 4 + rad(lat) / 2)) });
+const KM = Math.cos(rad(WVW.lat));                 // Bodenmeter pro Mercator-Meter
+const MB = mercOf(WVW.lat, WVW.lon);
+const MO = { x: MB.x, y: MB.y + 12 / KM };         // Mercator-Position des lokalen Ursprungs (12 m nördlich der Basis)
+const toLocal = (lat, lon) => { const m = mercOf(lat, lon); return { x: (m.x - MO.x) * KM, y: (m.y - MO.y) * KM }; };
+const LAKE_CENTER = { x: 0, y: 165 };
+
+function inLake(x, y) {
+  let inside = false;
+  for (let i = 0, j = LAKE.length - 1; i < LAKE.length; j = i++) {
+    const [xi, yi] = LAKE[i], [xj, yj] = LAKE[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function edgeDist(x, y) {
+  let m = Infinity;
+  for (let i = 0, j = LAKE.length - 1; i < LAKE.length; j = i++) {
+    const [ax, ay] = LAKE[j], [bx, by] = LAKE[i];
+    const dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+    m = Math.min(m, hyp(x - (ax + t * dx), y - (ay + t * dy)));
+  }
+  return m;
+}
+function smoothPath(pts) {
+  const n = pts.length, P = i => pts[(i + n) % n];
+  let d = `M${P(0)[0]},${-P(0)[1]}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0]},${-c1[1]} ${c2[0]},${-c2[1]} ${p2[0]},${-p2[1]}`;
+  }
+  return d + "Z";
+}
+
+/* ---------- Kursvorlagen ---------- */
+const up = w => ({ x: Math.sin(rad(w)), y: Math.cos(rad(w)) });
+const right = w => ({ x: Math.cos(rad(w)), y: -Math.sin(rad(w)) });
+const at = (c, a, u, b, r) => ({ x: c.x + a * u.x + b * r.x, y: c.y + a * u.y + b * r.y });
+
+/* Bezugspunkt c = Mitte der Lee-Gate-Linie (Versatz 0).
+   so = Abstand der Startlinie zur Lee-Gate-Linie in m (positiv = Richtung Wind, Winkel 90° zum Wind).
+   d34 / d56 = Abstand Boje 3–4 bzw. 5–6 in m.
+     Up-and-Down: Boje 3 (Luv) liegt exakt auf der Kursachse (Lee-Mitte, Windrichtung), Boje 4 (Ablauf) d34 links daneben, rechtwinklig zum Wind.
+     Luv-/Lee-Gate: Boje 3/4 bzw. 5/6 liegen je d/2 links und rechts der Kursachse (gleicher Abstand zur Mitte).
+   sa = Winkelkorrektur: Boje 1 (Start links) wird um Boje 2 (Start rechts) gedreht, sodass die Linie
+        (90° - sa) zum Wind liegt. Bei sa = 2 liegt die Linie in 88°, das rechte Ende zeigt zum Wind hin. */
+function startMarks(c, w, s, so, sa) {
+  const u = up(w), r = right(w), a = rad(sa);
+  const b2 = at(c, so, u, s / 2, r);
+  const b1 = { x: b2.x - s * (Math.sin(a) * u.x + Math.cos(a) * r.x), y: b2.y - s * (Math.sin(a) * u.y + Math.cos(a) * r.y) };
+  return [{ name: "Start links", tag: "", ...b1 }, { name: "Start rechts", tag: "", ...b2 }];
+}
+const TPL = {
+  updown: {
+    marks(c, w, L, s, so, sa, d34, d56) {
+      const u = up(w), r = right(w);
+      return [
+        ...startMarks(c, w, s, so, sa),
+        { name: "Luv", tag: "1", ...at(c, L, u, 0, r) },
+        { name: "Ablauf", tag: "1a", ...at(c, L, u, -d34, r) },
+        { name: "Lee-Tor links", tag: "", ...at(c, 0, u, -d56 / 2, r) },
+        { name: "Lee-Tor rechts", tag: "", ...at(c, 0, u, d56 / 2, r) }
+      ];
+    },
+    route: ["S", 2, 3, "G"]
+  },
+  gates: {
+    // Beide Gates: Verbindungslinie der Tonnen liegt im 90°-Winkel zum Wind (Querachse r)
+    marks(c, w, L, s, so, sa, d34, d56) {
+      const u = up(w), r = right(w), g3 = d34 / 2, g5 = d56 / 2;
+      return [
+        ...startMarks(c, w, s, so, sa),
+        { name: "Luv-Gate links", tag: "1", ...at(c, L, u, -g3, r) },
+        { name: "Luv-Gate rechts", tag: "1", ...at(c, L, u, g3, r) },
+        { name: "Lee-Gate links", tag: "2", ...at(c, 0, u, -g5, r) },
+        { name: "Lee-Gate rechts", tag: "2", ...at(c, 0, u, g5, r) }
+      ];
+    },
+    route: ["S", "LG", "G", "LG"]
+  }
+};
+
+/* ---------- Zustand ---------- */
+const COLORS = ["#d7263d", "#1b6ca8", "#f4b400", "#7b4fbf", "#2a9d5c", "#e0529c"];
+const STATE_TXT = { shore: "An Land", queued: "Wartet auf Start", transit: "Fährt zur Marke", hold: "Hält Position", ret: "Kehrt zurück", stopped: "Motoren aus" };
+const S = {
+  tpl: "updown", L: 150, s: 20, so: -16, sa: 0, d34: 14, d56: 14, c: { x: 0, y: 86 }, cw: 350, marks: [],
+  wind: 350, bft: 3, simSpeed: 10, selected: -1, pending: false, deployed: false, stopped: false, t: 0
+};
+
+const STORE = "bahnleger.v3";
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ tpl: S.tpl, L: S.L, s: S.s, so: S.so, sa: S.sa, d34: S.d34, d56: S.d56, c: S.c, cw: S.cw, marks: S.marks, wind: S.wind, bft: S.bft })); } catch (e) {}
+}
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (d && TPL[d.tpl] && Array.isArray(d.marks) && d.marks.length === 6) Object.assign(S, d);
+    else regen();
+  } catch (e) { regen(); }
+}
+function regen() { S.marks = TPL[S.tpl].marks(S.c, S.cw, S.L, S.s, S.so, S.sa, S.d34, S.d56); }
+
+const buoys = COLORS.map((col, i) => {
+  const home = { x: -25 + i * 10, y: 6 };
+  return { i, col, home, x: home.x, y: home.y, hdg: 0, bat: 100 - Math.random() * 7, wh: 0, state: "shore", tgt: null, startAt: 0, ix: 0, iy: 0, err: 0, trail: [], tAcc: 0 };
+});
+buoys.forEach(b => b.wh = 150 * b.bat / 100);
+
+/* ---------- Karte ---------- */
+const svg = $("map");
+let U = 1; // Meter pro Bildschirmpixel
+const V = { cx: 0, cy: 150, w: 400, h: 360 };      // Sichtfenster in Metern (Mitte, Breite)
+const NICE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+const fmtDist = v => v >= 1000 ? fmt(v / 1000, v % 1000 ? 1 : 0) + " km" : v + " m";
+function rectSize() { const r = svg.getBoundingClientRect(); return { w: r.width || 400, h: r.height || 360, l: r.left, t: r.top }; }
+function applyViewBox() {
+  const r = rectSize();
+  V.h = V.w * r.h / r.w; U = V.w / r.w;
+  svg.setAttribute("viewBox", `${V.cx - V.w / 2} ${-(V.cy + V.h / 2)} ${V.w} ${V.h}`);
+  let L = NICE[0]; for (const n of NICE) if (n / U <= 150) L = n;
+  $("scaleBar").style.width = (L / U) + "px"; $("scaleTxt").textContent = fmtDist(L);
+}
+function s2w(sx, sy) { const r = rectSize(); return { x: V.cx - V.w / 2 + sx / r.w * V.w, y: V.cy + V.h / 2 - sy / r.h * V.h }; }
+function viewFor(P, sx, sy, w) { // Sicht so setzen, dass Weltpunkt P unter Bildschirmpunkt (sx,sy) liegt
+  const r = rectSize(), h = w * r.h / r.w;
+  return { cx: P.x + w / 2 - sx / r.w * w, cy: P.y - h / 2 + sy / r.h * h, w };
+}
+let vPending = false, vFull = false;
+function setView(cx, cy, w) {
+  w = Math.max(MIN_W, Math.min(MAX_W, w));
+  const c = v => Math.max(-100000, Math.min(100000, v));
+  vFull = vFull || Math.abs(w - V.w) > 1e-9;
+  V.cx = c(cx); V.cy = c(cy); V.w = w; applyViewBox();
+  if (vPending) return; vPending = true;
+  requestAnimationFrame(() => { vPending = false; const f = vFull; vFull = false; drawTiles(); drawGrid(); if (f) { drawBase(); initBuoyEls(); drawCourse(); drawBuoys(); } });
+}
+function zoomAtScreen(f, sx, sy) { const P = s2w(sx, sy), v = viewFor(P, sx, sy, V.w / f); setView(v.cx, v.cy, v.w); }
+function fitBox(minX, minY, maxX, maxY, pad) {
+  const r = rectSize(), bw = (maxX - minX) * pad, bh = (maxY - minY) * pad;
+  setView((minX + maxX) / 2, (minY + maxY) / 2, Math.max(bw, bh * r.w / r.h));
+}
+const viewCourse = () => fitBox(-200, -30, 200, 330, 1);
+function viewRegion() { const a = toLocal(52.98, 8.42), b = toLocal(53.64, 9.02); fitBox(a.x, a.y, b.x, b.y, 1.04); }
+
+/* Kartenkacheln */
+const tiles = new Map(); let curZ = 0, need = new Set(), tileOk = 0, tileErr = 0, pruneT = 0;
+function pruneTiles(force) {
+  const done = [...need].every(k => { const t = tiles.get(k); return !t || t.done; });
+  if (!done && !force) return;
+  for (const [k, t] of tiles) if (t.z !== curZ || !need.has(k)) { t.el.remove(); tiles.delete(k); }
+}
+function drawTiles() {
+  const g = $("tiles"), r = rectSize();
+  const mpp = V.w / KM / r.w;
+  const z = Math.max(3, Math.min(TILE_MAX_Z, Math.round(Math.log2(2 * Math.PI * R_E / (256 * mpp)))));
+  const size = 2 * Math.PI * R_E / Math.pow(2, z), n = Math.pow(2, z);
+  const xa = MO.x + (V.cx - V.w / 2) / KM, xb = MO.x + (V.cx + V.w / 2) / KM;
+  const ya = MO.y + (V.cy - V.h / 2) / KM, yb = MO.y + (V.cy + V.h / 2) / KM;
+  const cl = v => Math.max(0, Math.min(n - 1, v));
+  const tx0 = cl(Math.floor((xa + HALF) / size)), tx1 = cl(Math.floor((xb + HALF) / size));
+  const ty0 = cl(Math.floor((HALF - yb) / size)), ty1 = cl(Math.floor((HALF - ya) / size));
+  curZ = z; need = new Set();
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+    const key = z + "/" + tx + "/" + ty; need.add(key);
+    if (tiles.has(key)) continue;
+    const X = (-HALF + tx * size - MO.x) * KM, Yt = (HALF - ty * size - MO.y) * KM, sz = size * KM;
+    const im = el("image", { x: X, y: -Yt, width: sz + 0.6 * U, height: sz + 0.6 * U, preserveAspectRatio: "none" }, g);
+    const t = { el: im, z, done: false }; tiles.set(key, t);
+    im.addEventListener("load", () => { t.done = true; tileOk++; $("attr").dataset.off = ""; clearTimeout(pruneT); pruneT = setTimeout(() => pruneTiles(false), 120); });
+    im.addEventListener("error", () => { t.done = true; im.remove(); tileErr++; if (tileErr >= 3 && !tileOk) $("attr").dataset.off = "1"; });
+    im.setAttribute("href", TILE_URL.replace("{z}", z).replace("{x}", tx).replace("{y}", ty));
+  }
+  clearTimeout(pruneT); pruneT = setTimeout(() => pruneTiles(true), 2500);
+}
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function drawStatic() {
+  const d = smoothPath(LAKE);
+  $("lake").setAttribute("d", d);
+  $("lakeclipPath").setAttribute("d", d);
+  drawGrid(); drawBase();
+}
+function drawGrid() {
+  const g = $("grid"); g.innerHTML = "";
+  let step = NICE[NICE.length - 1]; for (const n of NICE) if (n >= V.w / 8) { step = n; break; }
+  const x0 = V.cx - V.w / 2, x1 = V.cx + V.w / 2, y0 = V.cy - V.h / 2, y1 = V.cy + V.h / 2;
+  for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) el("line", { x1: x, y1: -y0, x2: x, y2: -y1, class: "gridl" }, g);
+  for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) {
+    el("line", { x1: x0, y1: -y, x2: x1, y2: -y, class: "gridl" }, g);
+    if (y > 0 && V.w <= 1200) { const t = el("text", { x: x0 + 6 * U, y: -y - 3 * U, class: "gridt", "font-size": 11 * U }, g); t.textContent = fmtDist(y); }
+  }
+}
+function drawBase() {
+  const bl = $("baseLayer"); bl.innerHTML = "";
+  el("rect", { x: BASE.x - 5 * U, y: -BASE.y - 5 * U, width: 10 * U, height: 10 * U, rx: 2 * U }, bl);
+  const bt = el("text", { x: BASE.x + 9 * U, y: -BASE.y + 4 * U, "font-size": 12 * U, "stroke-width": 3 * U }, bl);
+  bt.textContent = "Basisstation";
+  const b2 = el("text", { x: BASE.x + 9 * U, y: -BASE.y + 18 * U, "font-size": 10.5 * U, "stroke-width": 3 * U }, bl);
+  b2.textContent = "WSV Wulsdorf"; b2.style.fontWeight = "500";
+}
+
+/* Windschlieren */
+const streaks = [];
+function initStreaks() {
+  const g = $("streaks"); g.innerHTML = ""; streaks.length = 0;
+  if (reduceMotion) return;
+  for (let k = 0; k < 46; k++) {
+    const s = { x: -200 + Math.random() * 400, y: -30 + Math.random() * 360, len: 8 + Math.random() * 14, ph: Math.random() * 6.28 };
+    s.el = el("line", { class: "streak" }, g);
+    streaks.push(s);
+  }
+}
+function moveStreaks(dt) {
+  if (!streaks.length) return;
+  const dn = up(S.wind); // Wind kommt aus dieser Richtung, weht also nach -dn
+  const v = 3 + S.bft * 4;
+  for (const s of streaks) {
+    s.x -= dn.x * v * dt; s.y -= dn.y * v * dt; s.ph += dt * 2;
+    if (s.x < -210 || s.x > 210 || s.y < -40 || s.y > 340) {
+      // am luvseitigen Rand neu einsetzen
+      const r = right(S.wind), off = (Math.random() - 0.5) * 460;
+      s.x = LAKE_CENTER.x + dn.x * 230 + r.x * off; s.y = LAKE_CENTER.y + dn.y * 230 + r.y * off;
+    }
+    const L = s.len * (0.8 + 0.2 * Math.sin(s.ph));
+    s.el.setAttribute("x1", s.x); s.el.setAttribute("y1", -s.y);
+    s.el.setAttribute("x2", s.x - dn.x * L); s.el.setAttribute("y2", -(s.y - dn.y * L));
+    s.el.style.opacity = 0.35 + 0.1 * S.bft;
+  }
+}
+
+/* Kurs zeichnen */
+function point(key) {
+  const m = S.marks;
+  if (key === "S") return { x: (m[0].x + m[1].x) / 2, y: (m[0].y + m[1].y) / 2 };
+  if (key === "LG") return { x: (m[2].x + m[3].x) / 2, y: (m[2].y + m[3].y) / 2 };
+  if (key === "G") return { x: (m[4].x + m[5].x) / 2, y: (m[4].y + m[5].y) / 2 };
+  return m[key];
+}
+function drawCourse() {
+  const g = $("course"); g.innerHTML = "";
+  const m = S.marks;
+  el("line", { x1: m[0].x, y1: -m[0].y, x2: m[1].x, y2: -m[1].y, class: "startline" }, g);
+  el("line", { x1: m[4].x, y1: -m[4].y, x2: m[5].x, y2: -m[5].y, class: "route" }, g);
+  if (S.tpl === "gates") el("line", { x1: m[2].x, y1: -m[2].y, x2: m[3].x, y2: -m[3].y, class: "route" }, g);
+  const pts = TPL[S.tpl].route.map(point);
+  el("polyline", { points: pts.map(p => `${p.x},${-p.y}`).join(" "), class: "route" }, g);
+  const placed = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], d = hyp(b.x - a.x, b.y - a.y);
+    if (d < 25) continue;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    if (placed.some(q => hyp(q.x - mx, q.y - my) < 40 * U)) continue;
+    placed.push({ x: mx, y: my });
+    const t = el("text", { x: (a.x + b.x) / 2 + 6 * U, y: -(a.y + b.y) / 2 - 4 * U, class: "legt", "font-size": 12 * U, "stroke-width": 3 * U }, g);
+    t.textContent = fmt(d) + " m";
+  }
+  m.forEach((mk, i) => {
+    const bad = !inLake(mk.x, mk.y);
+    const mg = el("g", { class: "mark" + (bad ? " bad" : ""), transform: `translate(${mk.x},${-mk.y})`, "data-drag": "mark", "data-idx": i }, g);
+    el("circle", { r: 7 * U, class: "core" }, mg);
+    el("circle", { r: 10 * U, class: "ring" }, mg);
+    el("circle", { r: 24 * U, class: "hit" }, mg);
+    if (mk.tag) {
+      const left = mk.name === "Ablauf" || /links$/.test(mk.name) && S.tpl === "gates";
+      const t = el("text", { x: (left ? -13 : 13) * U, y: -9 * U, "text-anchor": left ? "end" : "start", class: "markt", "font-size": 13 * U, "stroke-width": 3.5 * U }, mg);
+      t.textContent = mk.tag;
+    }
+    mk._el = mg;
+  });
+  const groupLabel = (p, txt) => {
+    const r = right(S.cw);
+    const t = el("text", { x: p.x + r.x * (S.s / 2) + 16 * U, y: -(p.y + r.y * (S.s / 2)) + 5 * U, class: "markt", "font-size": 13 * U, "stroke-width": 3.5 * U }, g);
+    t.textContent = txt;
+  };
+  groupLabel(point("S"), "Start");
+  const gateLabel = (p, txt, hw) => {
+    const r = right(S.cw);
+    const t = el("text", { x: p.x + r.x * hw + 26 * U, y: -(p.y + r.y * hw) + 5 * U, class: "markt", "font-size": 13 * U, "stroke-width": 3.5 * U }, g);
+    t.textContent = txt;
+  };
+  if (S.tpl === "updown") gateLabel(point("G"), "Tor", S.d56 / 2);
+  else { gateLabel(point("G"), "Lee-Gate", S.d56 / 2); gateLabel(point("LG"), "Luv-Gate", S.d34 / 2); }
+  const s = point("S"), u = up(S.cw);
+  const hx = s.x - u.x * 14, hy = s.y - u.y * 14;
+  const hg = el("g", { class: "handle", transform: `translate(${hx},${-hy})`, "data-drag": "center" }, g);
+  el("circle", { r: 9 * U, class: "v" }, hg);
+  el("path", { d: `M${-5 * U},0 H${5 * U} M0,${-5 * U} V${5 * U}` }, hg);
+  el("circle", { r: 24 * U, class: "hitc" }, hg);
+  updateMarkStatus();
+  validate();
+}
+function updateMarkStatus() {
+  S.marks.forEach((mk, i) => {
+    if (!mk._el) return;
+    const b = buoys[i];
+    mk._el.classList.toggle("set", b.state === "hold" && b.tgt === mk && hyp(b.x - mk.x, b.y - mk.y) < 1.5 && !S.pending);
+  });
+}
+
+/* Bojen zeichnen */
+function initBuoyEls() {
+  const g = $("buoyLayer"); g.innerHTML = "";
+  buoys.forEach(b => {
+    b.trailEl = el("polyline", { class: "trail", stroke: b.col }, g);
+    b.g = el("g", {}, g);
+    b.selEl = el("circle", { r: 13 * U, class: "bsel", visibility: "hidden" }, b.g);
+    b.headEl = el("line", { x1: 0, y1: 0, x2: 0, y2: -13 * U, class: "bhead", stroke: b.col }, b.g);
+    el("circle", { r: 6.5 * U, class: "bbody", fill: b.col }, b.g);
+  });
+}
+function drawBuoys() {
+  buoys.forEach(b => {
+    b.g.setAttribute("transform", `translate(${b.x},${-b.y}) rotate(${b.hdg})`);
+    b.selEl.setAttribute("visibility", S.selected === b.i ? "visible" : "hidden");
+    b.trailEl.setAttribute("points", b.trail.map(p => `${p[0]},${-p[1]}`).join(" "));
+  });
+}
+
+/* ---------- Simulation ---------- */
+let gust = 0;
+function driftVec() {
+  const dn = up(S.wind), sp = [0, 0.04, 0.08, 0.14, 0.2, 0.27, 0.36][S.bft] * (1 + 0.45 * gust);
+  return { x: -dn.x * sp, y: -dn.y * sp };
+}
+const randn = () => { let u = 0, v = 0; while (!u) u = Math.random(); v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.283 * v); };
+function turnToward(b, target, rate, dt) {
+  const e = angDiff(target, b.hdg);
+  b.hdg = norm(b.hdg + Math.max(-rate * dt, Math.min(rate * dt, e)));
+  return angDiff(target, b.hdg);
+}
+function step(dt) {
+  S.t += dt;
+  gust += (-gust * 0.2 + 0.5 * randn()) * dt; gust = Math.max(-1, Math.min(1, gust));
+  const dr = driftVec();
+  for (const b of buoys) {
+    let thrust = 0, vx = 0, vy = 0;
+    if (b.state === "queued" && S.t >= b.startAt) b.state = "transit";
+    if (b.state === "transit" || b.state === "ret") {
+      const dx = b.tgt.x - b.x, dy = b.tgt.y - b.y, dist = hyp(dx, dy);
+      const e = turnToward(b, deg(Math.atan2(dx, dy)), 50, dt);
+      const sp = Math.min(1, 0.3 * dist + 0.15) * Math.max(0, Math.cos(rad(e)));
+      vx = Math.sin(rad(b.hdg)) * sp; vy = Math.cos(rad(b.hdg)) * sp; thrust = Math.max(sp, 0.15);
+      if (b.state === "transit" && dist < 2) { b.state = "hold"; b.ix = 0; b.iy = 0; }
+      if (b.state === "ret" && dist < 1.5) { b.state = "shore"; b.tgt = null; vx = vy = 0; }
+    } else if (b.state === "hold") {
+      const ex = b.tgt.x - b.x, ey = b.tgt.y - b.y, dist = hyp(ex, ey);
+      b.ix += ex * 0.08 * dt; b.iy += ey * 0.08 * dt;
+      const im = hyp(b.ix, b.iy); if (im > 0.5) { b.ix *= 0.5 / im; b.iy *= 0.5 / im; }
+      let cx = b.ix, cy = b.iy;
+      if (dist > 0.4) { cx += 0.25 * ex; cy += 0.25 * ey; }
+      const cm = hyp(cx, cy); if (cm > 0.6) { cx *= 0.6 / cm; cy *= 0.6 / cm; }
+      vx = cx; vy = cy; thrust = cm;
+      turnToward(b, S.wind, 20, dt);
+      b.err = b.err * 0.98 + dist * 0.02;
+      if (dist > 6) b.state = "transit";
+    }
+    const drifting = b.state !== "shore" && b.state !== "queued";
+    let nx = b.x + (vx + (drifting ? dr.x : 0)) * dt, ny = b.y + (vy + (drifting ? dr.y : 0)) * dt;
+    if (drifting) { nx += 0.03 * randn() * Math.sqrt(dt); ny += 0.03 * randn() * Math.sqrt(dt); }
+    if (inLake(nx, ny) || b.state === "ret" || b.state === "shore") { b.x = nx; b.y = ny; }
+    // Energie: Elektronik + Antrieb
+    const P = (b.state === "shore" ? 0.8 : 1.5) + 60 * Math.pow(Math.min(1, thrust), 1.5);
+    b.wh = Math.max(0, b.wh - P * dt / 3600); b.bat = 100 * b.wh / 150;
+    if (b.bat < 15 && (b.state === "hold" || b.state === "transit")) { b.state = "ret"; b.tgt = b.home; toast(`Boje ${b.i + 1}: Akku niedrig, kehrt zurück.`); }
+    b.tAcc += dt;
+    if (b.tAcc > 1 && b.state !== "shore") { b.tAcc = 0; b.trail.push([b.x, b.y]); if (b.trail.length > 90) b.trail.shift(); }
+  }
+}
+
+/* ---------- Aktionen ---------- */
+function validate() {
+  const bad = S.marks.filter(m => !inLake(m.x, m.y));
+  const ban = $("banner"), txt = $("bannerTxt"), btn = $("bannerBtn");
+  const shift = angDiff(S.wind, S.cw);
+  ban.className = "banner";
+  if (bad.length) {
+    ban.classList.add("show", "bad");
+    txt.textContent = bad.length === 1 ? `${bad[0].name} liegt an Land. Marke ins Wasser ziehen oder Kurs einpassen.` : `${bad.length} Marken liegen an Land. Kurs einpassen oder Marken verschieben.`;
+    btn.textContent = "Kurs einpassen"; btn.onclick = fitCourse;
+  } else if (Math.abs(shift) >= 8) {
+    ban.classList.add("show");
+    txt.textContent = `Wind hat um ${Math.abs(Math.round(shift))}° nach ${shift > 0 ? "rechts" : "links"} gedreht.`;
+    btn.textContent = "Kurs ausrichten"; btn.onclick = alignCourse;
+  }
+  const dep = $("deployBtn");
+  dep.disabled = bad.length > 0 || S.stopped;
+  dep.textContent = S.deployed && S.pending ? "Änderungen an Bojen senden" : "Kurs an Bojen senden";
+  $("deployHint").textContent = S.stopped ? "Not-Aus aktiv. Erst freigeben, dann senden." :
+    bad.length ? "Senden ist gesperrt, solange Marken an Land liegen." :
+    S.deployed && S.pending ? "Der Kurs wurde geändert. Die Bojen fahren erst nach dem Senden um." :
+    S.deployed ? "Bojen halten den gesendeten Kurs." : "Bojen liegen an Land bereit.";
+}
+function changed() {
+  if (S.deployed) S.pending = true;
+  drawCourse(); save();
+}
+function setTpl(t) {
+  S.tpl = t;
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tpl === t));
+  updateStartTxt(); regen(); changed();
+}
+function alignCourse() {
+  S.cw = S.wind; regen(); changed();
+  toast(`Kurs auf ${S.cw}° ${dirName(S.cw)} ausgerichtet.`);
+}
+function fits(c, L) {
+  const ms = TPL[S.tpl].marks(c, S.cw, L, S.s, S.so, S.sa, S.d34, S.d56);
+  return ms.every(m => inLake(m.x, m.y) && edgeDist(m.x, m.y) > 10);
+}
+function fitCourse() {
+  const u = up(S.cw), r = right(S.cw);
+  for (let L = S.L; L >= 40; L -= 5) {
+    const base = at(LAKE_CENTER, -L / 2 - Math.min(0, S.so) / 2, u, 0, r);
+    for (const a of [0, 10, -10, 20, -20, 30, -30, 45, -45, 60, -60]) for (const b of [0, 15, -15, 30, -30, 45, -45]) {
+      const c = at(base, a, u, b, r);
+      if (fits(c, L)) {
+        const shrunk = L < S.L;
+        S.L = L; S.c = c; regen(); syncInputs(); changed();
+        toast(shrunk ? `Kurs eingepasst, Schenkel auf ${L} m verkürzt.` : "Kurs im See eingepasst.");
+        return;
+      }
+    }
+  }
+  toast("Kein Platz für diesen Kurs. Kürzere Schenkel wählen.");
+}
+function deploy() {
+  if ($("deployBtn").disabled) return;
+  let k = 0;
+  buoys.forEach((b, i) => {
+    b.tgt = S.marks[i];
+    if (b.state === "shore" || b.state === "ret") { b.state = "queued"; b.startAt = S.t + (k++) * 4; }
+    else if (b.state !== "queued") b.state = "transit";
+  });
+  S.deployed = true; S.pending = false; validate(); updateMarkStatus();
+  toast(k ? "Kurs gesendet. Bojen fahren nacheinander los." : "Änderungen gesendet. Bojen fahren um.");
+}
+function recallAll() {
+  buoys.forEach(b => { if (b.state !== "shore") { b.state = "ret"; b.tgt = b.home; } });
+  S.deployed = false; S.pending = false; validate();
+  toast("Alle Bojen kehren zum Ufer zurück.");
+}
+function toggleStop() {
+  S.stopped = !S.stopped;
+  const btn = $("stopBtn");
+  if (S.stopped) {
+    buoys.forEach(b => { if (b.state !== "shore") { b._prev = b.state; b.state = "stopped"; } });
+    btn.textContent = "Freigeben"; btn.classList.remove("danger");
+    toast("Not-Aus: Alle Motoren sind aus.");
+  } else {
+    buoys.forEach(b => { if (b.state === "stopped") b.state = b._prev === "ret" ? "ret" : (b.tgt ? "transit" : "shore"); });
+    btn.textContent = "Not-Aus"; btn.classList.add("danger");
+    toast("Freigegeben. Bojen fahren weiter.");
+  }
+  validate();
+}
+
+/* ---------- Eingaben ---------- */
+function syncInputs() {
+  $("legIn").value = S.L; $("legOut").textContent = S.L + " m";
+  $("startIn").value = S.s; $("startOut").textContent = S.s + " m";
+  $("startOffIn").value = S.so; $("startAngIn").value = S.sa; $("d34In").value = S.d34; $("d56In").value = S.d56; updateStartTxt();
+  $("bftIn").value = S.bft; $("bftOut").textContent = S.bft + " Bft";
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tpl === S.tpl));
+  updateWindUI();
+}
+function updateStartTxt() {
+  const so = S.so, sa = S.sa;
+  $("startOffTxt").textContent = so === 0 ? "auf Höhe Lee-Gate" : `${fmt(Math.abs(so), so % 1 ? 1 : 0)} m ${so > 0 ? "Richtung Wind" : "Richtung Lee"}`;
+  $("startAngTxt").textContent = `Linie ${fmt(90 - sa, sa % 1 ? 1 : 0)}° zum Wind`;
+  const gates = S.tpl === "gates";
+  $("d34Txt").textContent = gates ? `je ${fmt(S.d34 / 2, 1)} m links/rechts der Mitte` : "Boje 3 mittig, Boje 4 links daneben";
+  $("d56Txt").textContent = `je ${fmt(S.d56 / 2, 1)} m links/rechts der Mitte`;
+}
+function updateWindUI() {
+  const w = Math.round(S.wind);
+  $("windTxt").textContent = `${w}° ${dirName(w)}`;
+  $("windSub").textContent = `Wind aus ${dirName(w)}, ${S.bft} Bft`;
+  $("miniArrow").setAttribute("transform", `rotate(${w})`);
+  $("dialTxt").innerHTML = `${w}°<small>${dirName(w)}</small>`;
+  $("dialArrow").setAttribute("transform", `rotate(${w})`);
+  $("dialCourse").setAttribute("transform", `rotate(${S.cw})`);
+  $("dial").setAttribute("aria-valuenow", w);
+  $("dial").setAttribute("aria-valuetext", `Wind aus ${w} Grad, ${dirName(w)}`);
+}
+function buildDial() {
+  const d = $("dial");
+  el("circle", { r: 60, fill: "var(--panel-2)", stroke: "var(--line)", "stroke-width": 1.5 }, d);
+  for (let a = 0; a < 360; a += 15) {
+    const L = a % 90 === 0 ? 9 : a % 45 === 0 ? 6 : 3.5;
+    el("line", { x1: 0, y1: -59, x2: 0, y2: -59 + L, stroke: "var(--ink-2)", "stroke-width": a % 90 ? 1 : 2, transform: `rotate(${a})` }, d);
+  }
+  [["N", 0], ["O", 90], ["S", 180], ["W", 270]].forEach(([t, a]) => {
+    const x = Math.sin(rad(a)) * 40, y = -Math.cos(rad(a)) * 40;
+    const e = el("text", { x, y: y + 5, "text-anchor": "middle", "font-size": 14, "font-weight": 700, fill: "var(--ink)", "font-family": "Barlow, sans-serif" }, d);
+    e.textContent = t;
+  });
+  const cg = el("g", { id: "dialCourse" }, d);
+  el("path", { d: "M0,-58 L-6,-46 L6,-46 Z", fill: "var(--mark)" }, cg);
+  const ag = el("g", { id: "dialArrow" }, d);
+  el("path", { d: "M0,-56 L0,22", stroke: "var(--ink)", "stroke-width": 4, "stroke-linecap": "round" }, ag);
+  el("path", { d: "M-9,12 L0,26 L9,12", stroke: "var(--ink)", "stroke-width": 4, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }, ag);
+  el("circle", { r: 7, cy: -54, fill: "var(--ink)" }, ag);
+  let drag = false;
+  const setFrom = e => {
+    const r = d.getBoundingClientRect();
+    const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+    S.wind = Math.round(norm(deg(Math.atan2(x, -y))));
+    updateWindUI(); validate(); save();
+  };
+  d.addEventListener("pointerdown", e => { drag = true; d.setPointerCapture(e.pointerId); setFrom(e); });
+  d.addEventListener("pointermove", e => { if (drag) setFrom(e); });
+  d.addEventListener("pointerup", () => drag = false);
+  d.addEventListener("keydown", e => {
+    const k = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5 }[e.key];
+    if (k) { e.preventDefault(); nudgeWind(k); }
+  });
+}
+function nudgeWind(d) { S.wind = norm(S.wind + d); updateWindUI(); validate(); save(); }
+
+/* Ziehen auf der Karte */
+let drag = null;
+function toWorld(e) {
+  const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  const q = p.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: q.x, y: -q.y };
+}
+svg.addEventListener("pointerdown", e => {
+  const t = e.target.closest("[data-drag]");
+  if (!t) return;
+  drag = { kind: t.dataset.drag, idx: +t.dataset.idx, last: toWorld(e) };
+  svg.setPointerCapture(e.pointerId); e.preventDefault();
+});
+svg.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const w = toWorld(e), dx = w.x - drag.last.x, dy = w.y - drag.last.y;
+  drag.last = w;
+  if (drag.kind === "mark") { S.marks[drag.idx].x += dx; S.marks[drag.idx].y += dy; }
+  else { S.marks.forEach(m => { m.x += dx; m.y += dy; }); S.c.x += dx; S.c.y += dy; }
+  if (S.deployed) S.pending = true;
+  drawCourse();
+});
+const endDrag = () => { if (drag) { drag = null; save(); } };
+
+/* Zoom und Verschieben: Mausrad, Ziehen, Pinch, Doppelklick, Tasten */
+const pts = new Map(); let gesture = null;
+const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+function startGesture() {
+  const a = [...pts.values()];
+  if (a.length === 1) gesture = { type: "pan", P: s2w(a[0].x, a[0].y) };
+  else if (a.length >= 2) { const m = mid(a[0], a[1]); gesture = { type: "pinch", P: s2w(m.x, m.y), d0: Math.max(1, hyp(a[0].x - a[1].x, a[0].y - a[1].y)), w0: V.w }; }
+  else gesture = null;
+  svg.classList.toggle("panning", !!gesture);
+}
+svg.addEventListener("pointerdown", e => {
+  if ((e.pointerType === "mouse" && e.button !== 0) || e.target.closest("[data-drag]")) return;
+  const r = rectSize(); pts.set(e.pointerId, { x: e.clientX - r.l, y: e.clientY - r.t });
+  try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  startGesture();
+});
+svg.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId) || !gesture) return;
+  const r = rectSize(), p = { x: e.clientX - r.l, y: e.clientY - r.t }; pts.set(e.pointerId, p);
+  let v;
+  if (gesture.type === "pan") v = viewFor(gesture.P, p.x, p.y, V.w);
+  else { const a = [...pts.values()], m = mid(a[0], a[1]); v = viewFor(gesture.P, m.x, m.y, gesture.w0 * gesture.d0 / Math.max(1, hyp(a[0].x - a[1].x, a[0].y - a[1].y))); }
+  setView(v.cx, v.cy, v.w);
+});
+const endPtr = e => { if (pts.delete(e.pointerId)) startGesture(); };
+svg.addEventListener("pointerup", endPtr); svg.addEventListener("pointercancel", endPtr);
+svg.addEventListener("wheel", e => {
+  e.preventDefault(); const r = rectSize();
+  zoomAtScreen(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015) * (e.ctrlKey ? 2.5 : 1)), e.clientX - r.l, e.clientY - r.t);
+}, { passive: false });
+svg.addEventListener("dblclick", e => { if (e.target.closest("[data-drag]")) return; const r = rectSize(); zoomAtScreen(2, e.clientX - r.l, e.clientY - r.t); });
+const zoomCenter = f => { const r = rectSize(); zoomAtScreen(f, r.w / 2, r.h / 2); };
+$("zIn").addEventListener("click", () => zoomCenter(1.6));
+$("zOut").addEventListener("click", () => zoomCenter(1 / 1.6));
+$("zCourse").addEventListener("click", viewCourse);
+$("zRegion").addEventListener("click", viewRegion);
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", endDrag);
+
+/* Bojenliste */
+function buildList() {
+  const ul = $("buoyList"); ul.innerHTML = "";
+  buoys.forEach(b => {
+    const li = document.createElement("li");
+    li.className = "buoy"; li.setAttribute("role", "option"); li.tabIndex = 0;
+    li.innerHTML = `<span class="dot" style="background:${b.col}"></span><span class="name">Boje ${b.i + 1}<small></small></span><span class="meta"><span class="d"></span><br><span class="p"></span><span class="batt"><b></b></span></span><span class="state"></span>`;
+    const sel = () => { S.selected = S.selected === b.i ? -1 : b.i; refreshList(); drawBuoys(); };
+    li.addEventListener("click", sel);
+    li.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sel(); } });
+    b.li = li; ul.appendChild(li);
+  });
+}
+function refreshList() {
+  buoys.forEach(b => {
+    const li = b.li, mk = S.marks[b.i];
+    li.setAttribute("aria-selected", S.selected === b.i);
+    li.querySelector(".name small").textContent = "→ " + mk.name;
+    const st = li.querySelector(".state");
+    st.textContent = STATE_TXT[b.state] + (b.state === "hold" ? ` (±${fmt(Math.max(0.1, b.err), 1)} m)` : "");
+    st.className = "state" + (b.state === "hold" ? " ok" : b.state === "stopped" ? " bad" : "");
+    let dtxt = "";
+    if (b.tgt && (b.state === "transit" || b.state === "ret" || b.state === "queued")) dtxt = fmt(hyp(b.tgt.x - b.x, b.tgt.y - b.y)) + " m";
+    else if (b.state === "hold") dtxt = "auf Marke";
+    li.querySelector(".d").textContent = dtxt;
+    li.querySelector(".p").textContent = fmt(b.bat) + " %";
+    const bar = li.querySelector(".batt b");
+    bar.style.width = Math.max(2, 22 * b.bat / 100) + "px";
+    bar.style.background = b.bat < 20 ? "var(--bad)" : b.bat < 40 ? "var(--warn)" : "var(--ok)";
+  });
+}
+
+/* Toast */
+let toastT = 0;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------- Start ---------- */
+load();
+buildDial();
+buildList();
+syncInputs();
+viewCourse(); applyViewBox(); drawTiles(); drawStatic(); initStreaks(); initBuoyEls(); drawCourse(); drawBuoys(); refreshList();
+
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setTpl(b.dataset.tpl)));
+$("legIn").addEventListener("input", e => { S.L = +e.target.value; $("legOut").textContent = S.L + " m"; regen(); changed(); });
+$("startIn").addEventListener("input", e => { S.s = +e.target.value; $("startOut").textContent = S.s + " m"; regen(); changed(); });
+function numInput(id, key, lo, hi) {
+  const inp = $(id);
+  const apply = () => {
+    const v = parseFloat(String(inp.value).replace(",", "."));
+    if (!isFinite(v)) return;
+    S[key] = Math.max(lo, Math.min(hi, Math.round(v * 10) / 10));
+    updateStartTxt(); regen(); changed();
+  };
+  inp.addEventListener("input", apply);
+  inp.addEventListener("change", () => { inp.value = S[key]; });
+  document.querySelectorAll(`.stepper button[data-for="${id}"]`).forEach(b => b.addEventListener("click", () => {
+    const v = parseFloat(String(inp.value).replace(",", ".")); 
+    inp.value = Math.max(lo, Math.min(hi, Math.round(((isFinite(v) ? v : S[key]) + +b.dataset.d) * 10) / 10));
+    apply();
+  }));
+}
+numInput("startOffIn", "so", -150, 250);
+numInput("startAngIn", "sa", -45, 45);
+numInput("d34In", "d34", 3, 100);
+numInput("d56In", "d56", 3, 100);
+$("bftIn").addEventListener("input", e => { S.bft = +e.target.value; $("bftOut").textContent = S.bft + " Bft"; updateWindUI(); save(); });
+$("wMinus").addEventListener("click", () => nudgeWind(-5));
+$("wPlus").addEventListener("click", () => nudgeWind(5));
+$("alignBtn").addEventListener("click", alignCourse);
+$("fitBtn").addEventListener("click", fitCourse);
+$("deployBtn").addEventListener("click", deploy);
+$("homeBtn").addEventListener("click", recallAll);
+$("stopBtn").addEventListener("click", toggleStop);
+$("simBtn").addEventListener("click", () => {
+  const opts = [1, 5, 10, 20]; S.simSpeed = opts[(opts.indexOf(S.simSpeed) + 1) % opts.length];
+  $("simBtn").innerHTML = `<i></i>Simulation ×${S.simSpeed}`;
+  toast(S.simSpeed === 1 ? "Simulation in Echtzeit." : `Simulation läuft ${S.simSpeed}-mal schneller.`);
+});
+let rT = 0;
+window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { applyViewBox(); drawTiles(); drawStatic(); initBuoyEls(); drawCourse(); drawBuoys(); }, 120); });
+
+let last = performance.now(), listT = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  let sim = dt * S.simSpeed;
+  while (sim > 0) { const h = Math.min(0.1, sim); step(h); sim -= h; }
+  moveStreaks(dt);
+  drawBuoys();
+  listT += dt;
+  if (listT > 0.25) { listT = 0; refreshList(); updateMarkStatus(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
